@@ -18,6 +18,8 @@ struct sockaddr_in inet_address;
 struct sockaddr_un client_unix_address;
 struct sockaddr_in client_inet_address;
 
+int unregister_client(message mess);
+
 client clients[MAX_CLIENTS];
 
 void sig_handler(int sig) {
@@ -34,7 +36,7 @@ int register_client(message msg, struct socaddr *addr, message_type type) {
     int i;
     for (i = 0; i < MAX_CLIENTS && clients[i].state != INACTIVE; i++);
     if (i == MAX_CLIENTS) {
-        return 0;
+        return -1;
     }
     strcpy(clients[i].name, msg.sender);
     if (type == UNIX) {
@@ -44,7 +46,7 @@ int register_client(message msg, struct socaddr *addr, message_type type) {
         clients[i].state = GLOBAL;
         memcpy(&clients[i].inet_address, addr, sizeof(struct sockaddr_in));
     }
-    return 1;
+    return 0;
 }
 
 int main(int argc, char *argv[]) {
@@ -111,10 +113,19 @@ int main(int argc, char *argv[]) {
             }
         } else if (message_r == MESSAGE) {
 
-        } else if (message_r == END) {
-
+        } else {
+            unregister_client(mess);
         }
 
     }
+}
+
+int unregister_client(message mess) {
+    int i;
+    for (i = 0; i < MAX_CLIENTS && !strcmp(clients[i].name, mess.sender); i++);
+    if (i == MAX_CLIENTS) {
+        return -1;
+    }
+    clients[i].state = INACTIVE;
 }
 

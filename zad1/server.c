@@ -23,11 +23,11 @@ struct sockaddr_in client_inet_address;
 socklen_t unix_address_size = sizeof(struct sockaddr_un);
 socklen_t inet_address_size = sizeof(struct sockaddr_in);
 
-int unregister_client(request mess);
-
 void send_to_all(request request1);
 
 void send_to(int i, request request1);
+
+void unregister_clients();
 
 client clients[MAX_CLIENTS];
 
@@ -51,16 +51,19 @@ int register_client(request req, struct socaddr *addr, message_type type) {
         }
     }
     int free;
-    for (free = 0; free < MAX_CLIENTS && clients[free].state == INACTIVE; free++);
+    for (free = 0; free < MAX_CLIENTS && clients[free].state != INACTIVE; free++);
     if (free == MAX_CLIENTS)
         return 1;
     strcpy(clients[free].name, req.sender);
     clients[free].time = time(NULL);
     if (type == UNIX) {
+        clients[free].state = LOCAL;
         clients[free].unix_address = *((struct sockaddr_un *) addr);
     } else if (type == INET) {
+        clients[free].state = GLOBAL;
         clients[free].inet_address = *((struct sockaddr_in *) addr);
     }
+    printf("%s registered\n", req.sender);
     return 0;
 }
 
@@ -108,23 +111,29 @@ int main(int argc, char *argv[]) {
     message_type message_r;
     request request1;
 
-    int flaga = 1;
-    while (flaga) {
+    while (1) {
         message_r = NO_MESSAGE;
         while (message_r == NO_MESSAGE) {
-            if (recvfrom(unix_socket, &request1, sizeof(request1), 0, &client_unix_address, &unix_address_size) != 0) {
+            if (recvfrom(unix_socket, &request1, sizeof(request1), 0, &client_unix_address, &unix_address_size) > 0) {
                 message_r = UNIX;
             } else if (
-                    recvfrom(inet_socket, &request1, sizeof(request1), 0, &client_inet_address, &inet_address_size) !=
+                    recvfrom(inet_socket, &request1, sizeof(request1), 0, &client_inet_address, &inet_address_size) >
                     0) {
                 message_r = INET;
             }
+            unregister_clients();
         }
         register_client(request1, message_r == UNIX ? (struct sockaddr *) &client_unix_address
                                                     : (struct sockaddr *) &client_inet_address, message_r);
-
         send_to_all(request1);
+    }
+}
 
+void unregister_clients() {
+    for (int i = 0; i < MAX_CLIENTS; i++) {
+        if (clients[i].state != INACTIVE && time(NULL) - clients[i].time > 30) {
+            clients[i].state = INACTIVE;
+        }
     }
 }
 

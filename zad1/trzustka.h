@@ -5,6 +5,7 @@
 #define MAX_MESSAGE_LENGTH 256
 #define MAX_CLIENT_NAME_LENGTH 32
 #define MAX_RESPONSE_TIME 5
+#define MAX_PATH_LENGTH 50
 
 typedef enum {
     NO_MESSAGE,
@@ -18,25 +19,17 @@ typedef enum {
     GLOBAL
 } client_state;
 
-typedef enum {
-    REGISTER,
-    MESSAGE,
-    END
-} request;
-
 typedef struct {
     char sender[MAX_CLIENT_NAME_LENGTH];
-    request req;
-    int client_num;
-} message;
+    char mess[MAX_MESSAGE_LENGTH];
+} request;
 
 typedef struct {
     char name[MAX_CLIENT_NAME_LENGTH];
     client_state state;
-    union {
-        struct sockaddr_un unix_address;
-        struct sockaddr_in inet_address;
-    };
+    clock_t time;
+    struct sockaddr_un unix_address;
+    struct sockaddr_in inet_address;
 } client;
 
 #endif //ZAD1_TRZUSTKA_H

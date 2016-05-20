@@ -5,6 +5,8 @@
 #include <netinet/in.h>
 #include <signal.h>
 #include <zconf.h>
+#include <arpa/inet.h>
+#include <time.h>
 #include "trzustka.h"
 
 int inet_socket;
@@ -18,7 +20,14 @@ struct sockaddr_in inet_address;
 struct sockaddr_un client_unix_address;
 struct sockaddr_in client_inet_address;
 
-int unregister_client(message mess);
+socklen_t unix_address_size = sizeof(struct sockaddr_un);
+socklen_t inet_address_size = sizeof(struct sockaddr_in);
+
+int unregister_client(request mess);
+
+void send_to_all(request request1);
+
+void send_to(int i, request request1);
 
 client clients[MAX_CLIENTS];
 
@@ -32,19 +41,25 @@ void cleanup() {
     remove(path);
 }
 
-int register_client(message msg, struct socaddr *addr, message_type type) {
-    int i;
-    for (i = 0; i < MAX_CLIENTS && clients[i].state != INACTIVE; i++);
-    if (i == MAX_CLIENTS) {
-        return -1;
+int register_client(request req, struct socaddr *addr, message_type type) {
+    for (int i = 0; i < MAX_CLIENTS; i++) {
+        if (clients[i].state != INACTIVE) {
+            if (strcmp(clients[i].name, req.sender) == 0) {
+                clients[i].time = time(NULL);
+                return 0;
+            }
+        }
     }
-    strcpy(clients[i].name, msg.sender);
+    int free;
+    for (free = 0; free < MAX_CLIENTS && clients[free].state == INACTIVE; free++);
+    if (free == MAX_CLIENTS)
+        return 1;
+    strcpy(clients[free].name, req.sender);
+    clients[free].time = time(NULL);
     if (type == UNIX) {
-        clients[i].state = LOCAL;
-        memcpy(&clients[i].unix_address, addr, sizeof(struct sockaddr_un));
-    } else {
-        clients[i].state = GLOBAL;
-        memcpy(&clients[i].inet_address, addr, sizeof(struct sockaddr_in));
+        clients[free].unix_address = *((struct sockaddr_un *) addr);
+    } else if (type == INET) {
+        clients[free].inet_address = *((struct sockaddr_in *) addr);
     }
     return 0;
 }
@@ -86,46 +101,59 @@ int main(int argc, char *argv[]) {
         exit(-6);
     }
 
+    for (int i = 0; i < MAX_CLIENTS; i++) {
+        clients[i].state = INACTIVE;
+    }
+
     message_type message_r;
-    message mess;
-    socklen_t unixaddr_size = sizeof(struct sockaddr_un);
-    socklen_t inetaddr_size = sizeof(struct sockaddr_in);
+    request request1;
 
     int flaga = 1;
     while (flaga) {
         message_r = NO_MESSAGE;
         while (message_r == NO_MESSAGE) {
-            if (recvfrom(unix_socket, &mess, sizeof(message), 0, &client_unix_address, &unixaddr_size) != 0) {
+            if (recvfrom(unix_socket, &request1, sizeof(request1), 0, &client_unix_address, &unix_address_size) != 0) {
                 message_r = UNIX;
-            } else if (recvfrom(inet_socket, &mess, sizeof(message), 0, &client_inet_address, &inetaddr_size) != 0) {
+            } else if (
+                    recvfrom(inet_socket, &request1, sizeof(request1), 0, &client_inet_address, &inet_address_size) !=
+                    0) {
                 message_r = INET;
             }
         }
-        if (mess.req == REGISTER) {
-            int res = 0;
-            if (message_r == UNIX) {
-                res = register_client(mess, &client_unix_address, message_r);
-            } else {
-                res = register_client(mess, &client_inet_address, message_r);
-            }
-            if (res == 0) {
-                printf("error\n");
-            }
-        } else if (message_r == MESSAGE) {
+        register_client(request1, message_r == UNIX ? (struct sockaddr *) &client_unix_address
+                                                    : (struct sockaddr *) &client_inet_address, message_r);
 
-        } else {
-            unregister_client(mess);
-        }
+        send_to_all(request1);
 
     }
 }
 
-int unregister_client(message mess) {
-    int i;
-    for (i = 0; i < MAX_CLIENTS && !strcmp(clients[i].name, mess.sender); i++);
-    if (i == MAX_CLIENTS) {
-        return -1;
+void send_to_all(request request1) {
+    for (int i = 0; i < MAX_CLIENTS; i++) {
+        if (clients[i].state != INACTIVE && strcmp(request1.sender, clients[i].name) != 0) {
+            send_to(i, request1);
+        }
     }
-    clients[i].state = INACTIVE;
+}
+
+void send_to(int i, request request1) {
+    struct sockaddr *address;
+    int socket;
+    socklen_t address_len;
+    if (clients[i].state == LOCAL) {
+        address = (struct sockaddr *) &(clients[i].unix_address);
+        socket = unix_socket;
+        address_len = unix_address_size;
+    } else {
+        address = (struct sockaddr *) &(clients[i].inet_address);
+        socket = inet_socket;
+        address_len = inet_address_size;
+        char ip[20];
+        inet_ntop(AF_INET, &(clients[i].inet_address.sin_addr.s_addr), ip, 20);
+    }
+    if (sendto(socket, (void *) &request1, sizeof(request1), 0, address, address_len) == -1) {
+        perror(NULL);
+    }
+
 }
 

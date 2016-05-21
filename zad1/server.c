@@ -114,10 +114,12 @@ int main(int argc, char *argv[]) {
     while (1) {
         message_r = NO_MESSAGE;
         while (message_r == NO_MESSAGE) {
-            if (recvfrom(unix_socket, &request1, sizeof(request1), 0, &client_unix_address, &unix_address_size) > 0) {
+            if (recvfrom(unix_socket, &request1, sizeof(request1), MSG_DONTWAIT, &client_unix_address,
+                         &unix_address_size) > 0) {
                 message_r = UNIX;
             } else if (
-                    recvfrom(inet_socket, &request1, sizeof(request1), 0, &client_inet_address, &inet_address_size) >
+                    recvfrom(inet_socket, &request1, sizeof(request1), MSG_DONTWAIT, &client_inet_address,
+                             &inet_address_size) >
                     0) {
                 message_r = INET;
             }

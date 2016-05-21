@@ -7,6 +7,7 @@
 #include <zconf.h>
 #include <arpa/inet.h>
 #include <time.h>
+#include <pthread.h>
 #include "trzustka.h"
 
 int inet_socket;
@@ -19,6 +20,8 @@ struct sockaddr_un unix_address;
 struct sockaddr_in inet_address;
 struct sockaddr_un client_unix_address;
 struct sockaddr_in client_inet_address;
+
+pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
 socklen_t unix_address_size = sizeof(struct sockaddr_un);
 socklen_t inet_address_size = sizeof(struct sockaddr_in);
@@ -114,6 +117,7 @@ int main(int argc, char *argv[]) {
     while (1) {
         message_r = NO_MESSAGE;
         while (message_r == NO_MESSAGE) {
+            pthread_mutex_lock(&mutex);
             if (recvfrom(unix_socket, &request1, sizeof(request1), MSG_DONTWAIT, &client_unix_address,
                          &unix_address_size) > 0) {
                 message_r = UNIX;
@@ -123,6 +127,7 @@ int main(int argc, char *argv[]) {
                     0) {
                 message_r = INET;
             }
+            pthread_mutex_unlock(&mutex);
             unregister_clients();
         }
         register_client(request1, message_r == UNIX ? (struct sockaddr *) &client_unix_address
@@ -162,9 +167,11 @@ void send_to(int i, request request1) {
         char ip[20];
         inet_ntop(AF_INET, &(clients[i].inet_address.sin_addr.s_addr), ip, 20);
     }
+    pthread_mutex_lock(&mutex);
     if (sendto(socket, (void *) &request1, sizeof(request1), 0, address, address_len) == -1) {
         perror(NULL);
     }
+    pthread_mutex_unlock(&mutex);
 
 }
 

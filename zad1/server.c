@@ -114,25 +114,38 @@ int main(int argc, char *argv[]) {
     message_type message_r;
     request request1;
 
-    while (1) {
+    fd_set sockset;
+    fd_set sockset1;
+    FD_ZERO(&sockset);
+    FD_SET(unix_socket, &sockset);
+    FD_SET(inet_socket, &sockset);
+    int flaga = 1;
+    while (flaga) {
+        sockset1 = sockset;
         message_r = NO_MESSAGE;
-        while (message_r == NO_MESSAGE) {
-            pthread_mutex_lock(&mutex);
-            if (recvfrom(unix_socket, &request1, sizeof(request1), MSG_DONTWAIT, &client_unix_address,
-                         &unix_address_size) > 0) {
-                message_r = UNIX;
-            } else if (
-                    recvfrom(inet_socket, &request1, sizeof(request1), MSG_DONTWAIT, &client_inet_address,
-                             &inet_address_size) >
-                    0) {
-                message_r = INET;
+        if (select(unix_socket > inet_socket ? unix_socket : inet_socket, &sockset1, NULL, NULL, NULL) > 0) {
+            if (FD_ISSET(unix_socket, &sockset1)) {
+                pthread_mutex_lock(&mutex);
+                if (recvfrom(unix_socket, &request1, sizeof(request1), MSG_DONTWAIT, &client_unix_address,
+                             &unix_address_size) > 0) {
+                    message_r = UNIX;
+                }
+                pthread_mutex_unlock(&mutex);
+            } else if (FD_ISSET(inet_socket, &sockset1)) {
+                pthread_mutex_lock(&mutex);
+                if (recvfrom(inet_socket, &request1, sizeof(request1), MSG_DONTWAIT, &client_inet_address,
+                             &inet_address_size) > 0) {
+                    message_r = INET;
+                }
+                pthread_mutex_unlock(&mutex);
             }
-            pthread_mutex_unlock(&mutex);
-            unregister_clients();
+            if (message_r != NO_MESSAGE) {
+                register_client(request1, message_r == UNIX ? (struct sockaddr *) &client_unix_address
+                                                            : (struct sockaddr *) &client_inet_address, message_r);
+                send_to_all(request1);
+            }
         }
-        register_client(request1, message_r == UNIX ? (struct sockaddr *) &client_unix_address
-                                                    : (struct sockaddr *) &client_inet_address, message_r);
-        send_to_all(request1);
+        unregister_clients();
     }
 }
 

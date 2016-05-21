@@ -124,14 +124,21 @@ int main(int argc, char *argv[]){
     }
 
     request request1;
-
+    fd_set sockset;
+    fd_set sockset1;
+    FD_ZERO(&sockset);
+    FD_SET(client_socket, &sockset);
     while (1) {
-        if (recvfrom(client_socket, (void *) &request1, sizeof(request1), 0, server_address, &address_size) == -1) {
-            perror(NULL);
-        } else {
-            printf("client %s : %s\n", request1.sender, request1.mess);
+        sockset1 = sockset;
+        if(select(client_socket+1,&sockset1,NULL,NULL,NULL)>0){
+            if(FD_ISSET(client_socket,&sockset1)){
+                if (recvfrom(client_socket, (void *) &request1, sizeof(request1), 0, server_address, &address_size) == -1) {
+                    perror(NULL);
+                } else {
+                    printf("client %s : %s\n", request1.sender, request1.mess);
+                }
+            }
         }
-        sleep(1);
     }
 }
 

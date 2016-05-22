@@ -13,6 +13,7 @@ int inet_socket;
 int unix_socket;
 char *path;
 long port;
+fd_set sockset;
 
 
 struct sockaddr_un unix_address;
@@ -41,7 +42,7 @@ void cleanup() {
     remove(path);
 }
 
-int register_client(request req, struct socaddr *addr, message_type type) {
+int register_client(request req, struct sockaddr *addr, message_type type) {
     for (int i = 0; i < MAX_CLIENTS; i++) {
         if (clients[i].state != INACTIVE) {
             if (strcmp(clients[i].name, req.sender) == 0) {
@@ -111,7 +112,6 @@ int main(int argc, char *argv[]) {
     message_type message_r;
     request request1;
 
-    fd_set sockset;
     fd_set sockset1;
     FD_ZERO(&sockset);
     FD_SET(unix_socket, &sockset);
@@ -121,12 +121,14 @@ int main(int argc, char *argv[]) {
         message_r = NO_MESSAGE;
         if (select(unix_socket > inet_socket ? unix_socket+1 : inet_socket+1, &sockset1, NULL, NULL, NULL) > 0) {
             if (FD_ISSET(unix_socket, &sockset1)) {
-                if (recvfrom(unix_socket, &request1, sizeof(request1), MSG_DONTWAIT, &client_unix_address,
+                if (recvfrom(unix_socket, &request1, sizeof(request1), MSG_DONTWAIT,
+                             (struct sockaddr *) &client_unix_address,
                              &unix_address_size) > 0) {
                     message_r = UNIX;
                 }
             } else if (FD_ISSET(inet_socket, &sockset1)) {
-                if (recvfrom(inet_socket, &request1, sizeof(request1), MSG_DONTWAIT, &client_inet_address,
+                if (recvfrom(inet_socket, &request1, sizeof(request1), MSG_DONTWAIT,
+                             (struct sockaddr *) &client_inet_address,
                              &inet_address_size) > 0) {
                     message_r = INET;
                 }

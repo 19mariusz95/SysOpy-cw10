@@ -7,7 +7,6 @@
 #include <zconf.h>
 #include <arpa/inet.h>
 #include <time.h>
-#include <pthread.h>
 #include "trzustka.h"
 
 int inet_socket;
@@ -32,8 +31,10 @@ client clients[MAX_CLIENTS];
 
 void sig_handler(int sig) {
     exit(0);
-}
 
+}
+void sig_handler1(int sig) {
+}
 void cleanup() {
     close(inet_socket);
     close(unix_socket);
@@ -45,6 +46,7 @@ int register_client(request req, int client_socket, message_type type) {
         if (clients[i].state != INACTIVE) {
             if (strcmp(clients[i].name, req.sender) == 0) {
                 clients[i].time = time(NULL);
+                clients[i].client_socket = client_socket;
                 return 0;
             }
         }
@@ -76,6 +78,7 @@ int main(int argc, char *argv[]) {
     }
     atexit(cleanup);
     signal(SIGINT, sig_handler);
+    signal(SIGPIPE,sig_handler1);
     port = strtol(argv[1], NULL, 10);
     path = argv[2];
 
@@ -152,7 +155,7 @@ int main(int argc, char *argv[]) {
             }
         }
         if (message_r != NO_MESSAGE) {
-            if (recv(client_socket, (void *) &request1, sizeof(request1), 0) != -1) {
+            if (recv(client_socket, (void *) &request1, sizeof(request1), 0) > 0) {
                 register_client(request1, client_socket, message_r);
                 send_to_all(request1);
             }
@@ -165,6 +168,7 @@ void unregister_clients() {
     for (int i = 0; i < MAX_CLIENTS; i++) {
         if (clients[i].state != INACTIVE && time(NULL) - clients[i].time > 30) {
             clients[i].state = INACTIVE;
+            FD_CLR(clients[i].client_socket,&sockset);
             close(clients[i].client_socket);
         }
     }

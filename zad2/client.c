@@ -120,9 +120,10 @@ int main(int argc, char *argv[]) {
         sockset1 = sockset;
         if (select(client_socket + 1, &sockset1, NULL, NULL, NULL) > 0) {
             if (FD_ISSET(client_socket, &sockset1)) {
-                if (recv(client_socket, (void *) &request1, sizeof(request1), 0) == -1) {
+                int tmp= recv(client_socket, (void *) &request1, sizeof(request1), 0);
+                if (tmp == -1) {
                     perror(NULL);
-                } else {
+                } else if(tmp>0) {
                     printf("client %s : %s\n", request1.sender, request1.mess);
                 }
             }

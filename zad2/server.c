@@ -33,15 +33,13 @@ void sig_handler(int sig) {
     exit(0);
 
 }
-void sig_handler1(int sig) {
-}
 void cleanup() {
     close(inet_socket);
     close(unix_socket);
     remove(path);
 }
 
-int register_client(request req, int client_socket, message_type type) {
+int register_client(request req, int client_socket) {
     for (int i = 0; i < MAX_CLIENTS; i++) {
         if (clients[i].state != INACTIVE) {
             if (strcmp(clients[i].name, req.sender) == 0) {
@@ -57,12 +55,8 @@ int register_client(request req, int client_socket, message_type type) {
         return 1;
     strcpy(clients[free].name, req.sender);
     clients[free].time = time(NULL);
-    if (type == UNIX) {
-        clients[free].state = LOCAL;
-    } else if (type == INET) {
-        clients[free].state = GLOBAL;
-    }
     clients[free].client_socket = client_socket;
+    clients[free].state = ACTIVE;
     if (client_socket > nsc)
         nsc = client_socket;
     FD_SET(client_socket, &sockset);
@@ -78,7 +72,7 @@ int main(int argc, char *argv[]) {
     }
     atexit(cleanup);
     signal(SIGINT, sig_handler);
-    signal(SIGPIPE,sig_handler1);
+    signal(SIGPIPE,SIG_IGN);
     port = strtol(argv[1], NULL, 10);
     path = argv[2];
 
@@ -137,18 +131,18 @@ int main(int argc, char *argv[]) {
             if (FD_ISSET(unix_socket, &sockset1)) {
                 client_socket = accept(unix_socket, NULL, NULL);
                 if (client_socket != -1) {
-                    message_r = UNIX;
+                    message_r = ABC;
                 }
             } else if (FD_ISSET(inet_socket, &sockset1)) {
                 client_socket = accept(inet_socket, NULL, NULL);
                 if (client_socket != -1) {
-                    message_r = INET;
+                    message_r = ABC;
                 }
             } else {
                 for (int i = 0; i < MAX_CLIENTS; i++) {
                     if (FD_ISSET(clients[i].client_socket, &sockset1)) {
                         client_socket = clients[i].client_socket;
-                        message_r = UNIX;
+                        message_r = ABC;
                         break;
                     }
                 }
@@ -156,7 +150,7 @@ int main(int argc, char *argv[]) {
         }
         if (message_r != NO_MESSAGE) {
             if (recv(client_socket, (void *) &request1, sizeof(request1), 0) > 0) {
-                register_client(request1, client_socket, message_r);
+                register_client(request1, client_socket);
                 send_to_all(request1);
             }
         }

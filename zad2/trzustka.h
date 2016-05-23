@@ -9,14 +9,12 @@
 
 typedef enum {
     NO_MESSAGE,
-    UNIX,
-    INET
+    ABC
 } message_type;
 
 typedef enum {
     INACTIVE = 0,
-    LOCAL,
-    GLOBAL
+    ACTIVE
 } client_state;
 
 typedef struct {

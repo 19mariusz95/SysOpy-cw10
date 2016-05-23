@@ -22,11 +22,17 @@ struct sockaddr_un server_unix_address;
 struct sockaddr_in server_inet_address;
 struct sockaddr_un client_unix_address;
 struct sockaddr_in client_inet_address;
+pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
+request to_send;
 
 char client_path[MAX_PATH_LENGTH];
 char server_path[MAX_PATH_LENGTH];
 
 pthread_t thread;
+pthread_t main_thread;
+
+int wait_send = 0;
 
 void *thread_fun(void *arg);
 
@@ -37,7 +43,17 @@ void cleanup() {
 }
 
 void sig_handler(int sig) {
-    exit(0);
+    if(sig==SIGUSR1){
+        pthread_mutex_lock(&mutex);
+        if (send(client_socket, (void *) &to_send, sizeof(to_send), 0) == -1) {
+            perror(NULL);
+            exit(-11);
+        }
+        wait_send = 0;
+        pthread_cond_signal(&cond);
+        pthread_mutex_unlock(&mutex);
+    }else
+        exit(0);
 }
 
 int main(int argc, char *argv[]) {
@@ -45,8 +61,10 @@ int main(int argc, char *argv[]) {
         printf("no enough args\n");
         exit(-1);
     }
+    main_thread = pthread_self();
     atexit(cleanup);
     signal(SIGINT, sig_handler);
+    signal(SIGUSR1, sig_handler);
     client_id = argv[1];
     if (strlen(client_id) >= MAX_CLIENT_NAME_LENGTH) {
         printf("too long id\n");
@@ -110,6 +128,11 @@ int main(int argc, char *argv[]) {
         perror(NULL);
         exit(-5);
     }
+    strcpy(to_send.sender,client_id);
+    if(send(client_socket, (void *) &to_send, sizeof(to_send), 0) == -1){
+        perror(NULL);
+        exit(-6);
+    }
 
     request request1;
     fd_set sockset;
@@ -120,7 +143,7 @@ int main(int argc, char *argv[]) {
         sockset1 = sockset;
         if (select(client_socket + 1, &sockset1, NULL, NULL, NULL) > 0) {
             if (FD_ISSET(client_socket, &sockset1)) {
-                int tmp= recv(client_socket, (void *) &request1, sizeof(request1), 0);
+                int tmp= recv(client_socket, (void *) &request1, sizeof(request1), MSG_DONTWAIT);
                 if (tmp == -1) {
                     perror(NULL);
                 } else if(tmp>0) {
@@ -133,20 +156,22 @@ int main(int argc, char *argv[]) {
 
 void *thread_fun(void *arg) {
     while (1) {
+        pthread_mutex_lock(&mutex);
+        while(wait_send)
+            pthread_cond_wait(&cond,&mutex);
         char message_text[MAX_CLIENT_NAME_LENGTH], *result;
         result = fgets(message_text, MAX_CLIENT_NAME_LENGTH - 1, stdin);
         if (result != NULL) {
             if (strlen(message_text) >= MAX_MESSAGE_LENGTH) {
                 printf("%s\n", "too long input");
             } else {
-                request request1;
-                strcpy(request1.sender, client_id);
-                strcpy(request1.mess, message_text);
-                if (send(client_socket, (void *) &request1, sizeof(request1), 0) == -1) {
-                    perror(NULL);
-                    exit(-11);
-                }
+                strcpy(to_send.sender, client_id);
+                strcpy(to_send.mess, message_text);
+                wait_send = 1;
             }
         }
+        pthread_cond_signal(&cond);
+        pthread_mutex_unlock(&mutex);
+        pthread_kill(main_thread,SIGUSR1);
     }
 }

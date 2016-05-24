@@ -27,6 +27,7 @@ typedef struct {
     client_state state;
     clock_t time;
     int client_socket;
+    int tmp;
 } client;
 
 #endif //ZAD1_TRZUSTKA_H

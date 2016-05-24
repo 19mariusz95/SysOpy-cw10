@@ -45,6 +45,7 @@ int register_client(request req, int client_socket) {
             if (strcmp(clients[i].name, req.sender) == 0) {
                 clients[i].time = time(NULL);
                 clients[i].client_socket = client_socket;
+                clients[i].tmp = 1;
                 return 0;
             }
         }
@@ -57,6 +58,7 @@ int register_client(request req, int client_socket) {
     clients[free].time = time(NULL);
     clients[free].client_socket = client_socket;
     clients[free].state = ACTIVE;
+    clients[free].tmp = 0;
     if (client_socket > nsc)
         nsc = client_socket;
     FD_SET(client_socket, &sockset);
@@ -127,7 +129,10 @@ int main(int argc, char *argv[]) {
     while (1) {
         sockset1 = sockset;
         message_r = NO_MESSAGE;
-        if (select(nsc + 1, &sockset1, NULL, NULL, NULL) > 0) {
+        struct timeval tim1;
+        tim1.tv_sec = 1;
+        tim1.tv_usec = 0;
+        if (select(nsc + 1, &sockset1, NULL, NULL, &tim1) > 0) {
             if (FD_ISSET(unix_socket, &sockset1)) {
                 client_socket = accept(unix_socket, NULL, NULL);
                 if (client_socket != -1) {
@@ -160,7 +165,7 @@ int main(int argc, char *argv[]) {
 
 void unregister_clients() {
     for (int i = 0; i < MAX_CLIENTS; i++) {
-        if (clients[i].state != INACTIVE && time(NULL) - clients[i].time > 30) {
+        if (clients[i].state != INACTIVE && clients[i].tmp == 0 && time(NULL) - clients[i].time > 30) {
             clients[i].state = INACTIVE;
             FD_CLR(clients[i].client_socket,&sockset);
             close(clients[i].client_socket);

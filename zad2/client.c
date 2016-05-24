@@ -15,13 +15,11 @@ char *client_id;
 socklen_t address_size;
 char server_ip[15];
 int port;
-int client_socket;
+int socket1;
 struct sockaddr *server_address;
 
 struct sockaddr_un server_unix_address;
 struct sockaddr_in server_inet_address;
-struct sockaddr_un client_unix_address;
-struct sockaddr_in client_inet_address;
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
 request to_send;
@@ -37,7 +35,7 @@ int wait_send = 0;
 void *thread_fun(void *arg);
 
 void cleanup() {
-    close(client_socket);
+    close(socket1);
     remove(client_path);
     exit(0);
 }
@@ -45,7 +43,7 @@ void cleanup() {
 void sig_handler(int sig) {
     if(sig==SIGUSR1){
         pthread_mutex_lock(&mutex);
-        if (send(client_socket, (void *) &to_send, sizeof(to_send), 0) == -1) {
+        if (send(socket1, (void *) &to_send, sizeof(to_send), 0) == -1) {
             perror(NULL);
             exit(-11);
         }
@@ -74,7 +72,7 @@ int main(int argc, char *argv[]) {
     if (global == 0) { // local
         strcpy(server_path, argv[3]);
     } else if (global == 1) {
-        if (argc < 6) {
+        if (argc < 5) {
             printf("no enough args\n");
             exit(-1);
         }
@@ -85,12 +83,13 @@ int main(int argc, char *argv[]) {
         printf("bad arg\n");
         exit(-2);
     }
+
     if (global == 1) {
-        client_socket = socket(AF_INET, SOCK_STREAM, 0);
+        socket1 = socket(AF_INET, SOCK_STREAM, 0);
     } else {
-        client_socket = socket(AF_UNIX, SOCK_STREAM, 0);
+        socket1 = socket(AF_UNIX, SOCK_STREAM, 0);
     }
-    if (client_socket == -1) {
+    if (socket1 == -1) {
         perror(NULL);
         exit(-5);
     }
@@ -98,9 +97,7 @@ int main(int argc, char *argv[]) {
     sprintf(client_path, "%s/st.socket", client_id);
 
     memset(&server_unix_address, 0, sizeof(server_unix_address));
-    memset(&client_unix_address, 0, sizeof(client_unix_address));
     memset(&server_inet_address, 0, sizeof(server_inet_address));
-    memset(&client_inet_address, 0, sizeof(client_inet_address));
 
     if (global == 0) {
         server_unix_address.sun_family = AF_UNIX;
@@ -124,12 +121,12 @@ int main(int argc, char *argv[]) {
         address_size = sizeof(struct sockaddr_un);
     }
 
-    if (connect(client_socket, server_address, address_size) == -1) {
+    if (connect(socket1, server_address, address_size) == -1) {
         perror(NULL);
         exit(-5);
     }
     strcpy(to_send.sender,client_id);
-    if(send(client_socket, (void *) &to_send, sizeof(to_send), 0) == -1){
+    if (send(socket1, (void *) &to_send, sizeof(to_send), 0) == -1) {
         perror(NULL);
         exit(-6);
     }
@@ -138,16 +135,19 @@ int main(int argc, char *argv[]) {
     fd_set sockset;
     fd_set sockset1;
     FD_ZERO(&sockset);
-    FD_SET(client_socket, &sockset);
+    FD_SET(socket1, &sockset);
     while (1) {
         sockset1 = sockset;
-        if (select(client_socket + 1, &sockset1, NULL, NULL, NULL) > 0) {
-            if (FD_ISSET(client_socket, &sockset1)) {
-                int tmp= recv(client_socket, (void *) &request1, sizeof(request1), MSG_DONTWAIT);
+        if (select(socket1 + 1, &sockset1, NULL, NULL, NULL) > 0) {
+            if (FD_ISSET(socket1, &sockset1)) {
+                ssize_t tmp = recv(socket1, (void *) &request1, sizeof(request1), MSG_DONTWAIT);
                 if (tmp == -1) {
                     perror(NULL);
                 } else if(tmp>0) {
                     printf("client %s : %s\n", request1.sender, request1.mess);
+                } else {
+                    printf("disconnectd\n");
+                    exit(1);
                 }
             }
         }

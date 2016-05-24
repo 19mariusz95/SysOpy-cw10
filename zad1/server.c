@@ -116,21 +116,33 @@ int main(int argc, char *argv[]) {
     FD_ZERO(&sockset);
     FD_SET(unix_socket, &sockset);
     FD_SET(inet_socket, &sockset);
-    while (1) {
+    int flaga = 1;
+    while (flaga) {
         sockset1 = sockset;
         message_r = NO_MESSAGE;
-        if (select(unix_socket > inet_socket ? unix_socket+1 : inet_socket+1, &sockset1, NULL, NULL, NULL) > 0) {
+        struct timeval tim1;
+        tim1.tv_sec = 1;
+        tim1.tv_usec = 0;
+        if (select(unix_socket > inet_socket ? unix_socket + 1 : inet_socket + 1, &sockset1, NULL, NULL, &tim1) > 0) {
             if (FD_ISSET(unix_socket, &sockset1)) {
-                if (recvfrom(unix_socket, &request1, sizeof(request1), MSG_DONTWAIT,
-                             (struct sockaddr *) &client_unix_address,
-                             &unix_address_size) > 0) {
+                ssize_t tmp = recvfrom(unix_socket, &request1, sizeof(request1), MSG_DONTWAIT,
+                                       (struct sockaddr *) &client_unix_address,
+                                       &unix_address_size);
+                if (tmp > 0) {
                     message_r = UNIX;
+                } else if (tmp == 0) {
+                    printf("disconnected\n");
+                    exit(1);
                 }
             } else if (FD_ISSET(inet_socket, &sockset1)) {
-                if (recvfrom(inet_socket, &request1, sizeof(request1), MSG_DONTWAIT,
-                             (struct sockaddr *) &client_inet_address,
-                             &inet_address_size) > 0) {
+                ssize_t tmp = recvfrom(inet_socket, &request1, sizeof(request1), MSG_DONTWAIT,
+                                       (struct sockaddr *) &client_inet_address,
+                                       &inet_address_size);
+                if (tmp > 0) {
                     message_r = INET;
+                } else if (tmp == 0) {
+                    printf("disconnected\n");
+                    exit(1);
                 }
             }
             if (message_r != NO_MESSAGE) {
@@ -147,6 +159,7 @@ void unregister_clients() {
     for (int i = 0; i < MAX_CLIENTS; i++) {
         if (clients[i].state != INACTIVE && time(NULL) - clients[i].time > 30) {
             clients[i].state = INACTIVE;
+            printf("client %s unregistered\n", clients[i].name);
         }
     }
 }

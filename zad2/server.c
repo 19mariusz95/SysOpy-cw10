@@ -18,8 +18,6 @@ fd_set sockset;
 
 struct sockaddr_un unix_address;
 struct sockaddr_in inet_address;
-struct sockaddr_un client_unix_address;
-struct sockaddr_in client_inet_address;
 
 void send_to_all(request request1);
 
@@ -31,7 +29,6 @@ client clients[MAX_CLIENTS];
 
 void sig_handler(int sig) {
     exit(0);
-
 }
 void cleanup() {
     close(inet_socket);
@@ -154,9 +151,19 @@ int main(int argc, char *argv[]) {
             }
         }
         if (message_r != NO_MESSAGE) {
-            if (recv(client_socket, (void *) &request1, sizeof(request1), 0) > 0) {
+            ssize_t tmp = recv(client_socket, (void *) &request1, sizeof(request1), 0);
+            if (tmp > 0) {
                 register_client(request1, client_socket);
                 send_to_all(request1);
+            } else if (tmp == 0) {
+                for (int i = 0; i < MAX_CLIENTS; i++) {
+                    if (clients[i].client_socket == client_socket) {
+                        clients[i].state = INACTIVE;
+                        break;
+                    }
+                }
+                FD_CLR(client_socket, &sockset);
+                close(client_socket);
             }
         }
         unregister_clients();
@@ -183,9 +190,7 @@ void send_to_all(request request1) {
 
 void send_to(int i, request request1) {
     int client_socket = clients[i].client_socket;
-    if (send(client_socket, (void *) &request1, sizeof(request1), 0) == -1) {
-        perror(NULL);
-    }
+    send(client_socket, (void *) &request1, sizeof(request1), 0);
 
 }
 

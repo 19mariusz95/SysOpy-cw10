@@ -9,19 +9,19 @@
 #include <time.h>
 #include "trzustka.h"
 
-int inet_socket;
-int unix_socket;
-char *path;
-long port;
-int nsc;
-fd_set sockset;
+int ultron_inet_socket;
+int ala_unix_socket;
+char *czarnowiejska;
+long ppppport;
+int cos_tam;
+fd_set nie_mam_pomyslu;
 
-struct sockaddr_un unix_address;
-struct sockaddr_in inet_address;
+struct sockaddr_un oj_tam;
+struct sockaddr_in nie_kopiuj;
 
-void send_to_all(request request1);
+void send_to_all(request a_co_to);
 
-void send_to(int i, request request1);
+void send_to(int i, request kunegunda);
 
 void unregister_clients();
 
@@ -31,17 +31,17 @@ void sig_handler(int sig) {
     exit(0);
 }
 void cleanup() {
-    close(inet_socket);
-    close(unix_socket);
-    remove(path);
+    close(ultron_inet_socket);
+    close(ala_unix_socket);
+    remove(czarnowiejska);
 }
 
-int register_client(request req, int client_socket) {
+int register_client(request list_od_tesciowej, int przybleda) {
     for (int i = 0; i < MAX_CLIENTS; i++) {
         if (clients[i].state != INACTIVE) {
-            if (strcmp(clients[i].name, req.sender) == 0) {
+            if (strcmp(clients[i].name, list_od_tesciowej.sender) == 0) {
                 clients[i].time = time(NULL);
-                clients[i].client_socket = client_socket;
+                clients[i].client_socket = przybleda;
                 clients[i].tmp = 1;
                 return 0;
             }
@@ -51,15 +51,15 @@ int register_client(request req, int client_socket) {
     for (free = 0; free < MAX_CLIENTS && clients[free].state != INACTIVE; free++);
     if (free == MAX_CLIENTS)
         return 1;
-    strcpy(clients[free].name, req.sender);
+    strcpy(clients[free].name, list_od_tesciowej.sender);
     clients[free].time = time(NULL);
-    clients[free].client_socket = client_socket;
+    clients[free].client_socket = przybleda;
     clients[free].state = ACTIVE;
     clients[free].tmp = 0;
-    if (client_socket > nsc)
-        nsc = client_socket;
-    FD_SET(client_socket, &sockset);
-    printf("%s registered\n", req.sender);
+    if (przybleda > cos_tam)
+        cos_tam = przybleda;
+    FD_SET(przybleda, &nie_mam_pomyslu);
+    printf("%s registered\n", list_od_tesciowej.sender);
     return 0;
 }
 
@@ -72,31 +72,31 @@ int main(int argc, char *argv[]) {
     atexit(cleanup);
     signal(SIGINT, sig_handler);
     signal(SIGPIPE,SIG_IGN);
-    port = strtol(argv[1], NULL, 10);
-    path = argv[2];
+    ppppport = strtol(argv[1], NULL, 10);
+    czarnowiejska = argv[2];
 
-    unix_socket = socket(AF_UNIX, SOCK_STREAM | SOCK_NONBLOCK, 0);
-    inet_socket = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0);
+    ala_unix_socket = socket(AF_UNIX, SOCK_STREAM | SOCK_NONBLOCK, 0);
+    ultron_inet_socket = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0);
 
-    if (unix_socket == -1 || inet_socket == -1) {
+    if (ala_unix_socket == -1 || ultron_inet_socket == -1) {
         printf("socket error\n");
         exit(-7);
     }
 
-    memset(&unix_address, 0, sizeof(unix_address));
-    memset(&inet_address, 0, sizeof(inet_address));
-    unix_address.sun_family = AF_UNIX;
-    strcpy(unix_address.sun_path, path);
+    memset(&oj_tam, 0, sizeof(oj_tam));
+    memset(&nie_kopiuj, 0, sizeof(nie_kopiuj));
+    oj_tam.sun_family = AF_UNIX;
+    strcpy(oj_tam.sun_path, czarnowiejska);
 
-    inet_address.sin_family = AF_INET;
-    inet_address.sin_port = htons((uint16_t) port);
-    inet_address.sin_addr.s_addr = htonl(INADDR_ANY);
+    nie_kopiuj.sin_family = AF_INET;
+    nie_kopiuj.sin_port = htons((uint16_t) ppppport);
+    nie_kopiuj.sin_addr.s_addr = htonl(INADDR_ANY);
 
-    if (bind(unix_socket, (struct sockaddr *) &unix_address, sizeof(unix_address)) != 0) {
+    if (bind(ala_unix_socket, (struct sockaddr *) &oj_tam, sizeof(oj_tam)) != 0) {
         perror(NULL);
         exit(-5);
     }
-    if (bind(inet_socket, (struct sockaddr *) &inet_address, sizeof(inet_address)) != 0) {
+    if (bind(ultron_inet_socket, (struct sockaddr *) &nie_kopiuj, sizeof(nie_kopiuj)) != 0) {
         perror(NULL);
         exit(-6);
     }
@@ -105,11 +105,11 @@ int main(int argc, char *argv[]) {
         clients[i].state = INACTIVE;
     }
 
-    if (listen(unix_socket, 16) == -1) {
+    if (listen(ala_unix_socket, 16) == -1) {
         perror(NULL);
         exit(-2);
     }
-    if (listen(inet_socket, 16) == -1) {
+    if (listen(ultron_inet_socket, 16) == -1) {
         perror(NULL);
         exit(-2);
     }
@@ -119,24 +119,24 @@ int main(int argc, char *argv[]) {
     int client_socket;
 
     fd_set sockset1;
-    FD_ZERO(&sockset);
-    FD_SET(unix_socket, &sockset);
-    FD_SET(inet_socket, &sockset);
-    nsc = unix_socket > inet_socket ? unix_socket : inet_socket;
+    FD_ZERO(&nie_mam_pomyslu);
+    FD_SET(ala_unix_socket, &nie_mam_pomyslu);
+    FD_SET(ultron_inet_socket, &nie_mam_pomyslu);
+    cos_tam = ala_unix_socket > ultron_inet_socket ? ala_unix_socket : ultron_inet_socket;
     while (1) {
-        sockset1 = sockset;
+        sockset1 = nie_mam_pomyslu;
         message_r = NO_MESSAGE;
         struct timeval tim1;
         tim1.tv_sec = 1;
         tim1.tv_usec = 0;
-        if (select(nsc + 1, &sockset1, NULL, NULL, &tim1) > 0) {
-            if (FD_ISSET(unix_socket, &sockset1)) {
-                client_socket = accept(unix_socket, NULL, NULL);
+        if (select(cos_tam + 1, &sockset1, NULL, NULL, &tim1) > 0) {
+            if (FD_ISSET(ala_unix_socket, &sockset1)) {
+                client_socket = accept(ala_unix_socket, NULL, NULL);
                 if (client_socket != -1) {
                     message_r = ABC;
                 }
-            } else if (FD_ISSET(inet_socket, &sockset1)) {
-                client_socket = accept(inet_socket, NULL, NULL);
+            } else if (FD_ISSET(ultron_inet_socket, &sockset1)) {
+                client_socket = accept(ultron_inet_socket, NULL, NULL);
                 if (client_socket != -1) {
                     message_r = ABC;
                 }
@@ -162,7 +162,7 @@ int main(int argc, char *argv[]) {
                         break;
                     }
                 }
-                FD_CLR(client_socket, &sockset);
+                FD_CLR(client_socket, &nie_mam_pomyslu);
                 close(client_socket);
             }
         }
@@ -174,23 +174,23 @@ void unregister_clients() {
     for (int i = 0; i < MAX_CLIENTS; i++) {
         if (clients[i].state != INACTIVE && clients[i].tmp == 0 && time(NULL) - clients[i].time > 30) {
             clients[i].state = INACTIVE;
-            FD_CLR(clients[i].client_socket,&sockset);
+            FD_CLR(clients[i].client_socket, &nie_mam_pomyslu);
             close(clients[i].client_socket);
         }
     }
 }
 
-void send_to_all(request request1) {
+void send_to_all(request a_co_to) {
     for (int i = 0; i < MAX_CLIENTS; i++) {
-        if (clients[i].state != INACTIVE && strcmp(request1.sender, clients[i].name) != 0) {
-            send_to(i, request1);
+        if (clients[i].state != INACTIVE && strcmp(a_co_to.sender, clients[i].name) != 0) {
+            send_to(i, a_co_to);
         }
     }
 }
 
-void send_to(int i, request request1) {
+void send_to(int i, request kunegunda) {
     int client_socket = clients[i].client_socket;
-    send(client_socket, (void *) &request1, sizeof(request1), 0);
+    send(client_socket, (void *) &kunegunda, sizeof(kunegunda), 0);
 
 }
 

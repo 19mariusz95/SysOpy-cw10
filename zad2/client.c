@@ -12,14 +12,14 @@
 
 char *client_id;
 
-socklen_t address_size;
-char server_ip[15];
-int port;
-int socket1;
-struct sockaddr *server_address;
+socklen_t jakas_tam_zmienna;
+char server_aj_pi[15];
+int ppppport;
+int so_so_so_socket;
+struct sockaddr *osp_server_address;
 
-struct sockaddr_un server_unix_address;
-struct sockaddr_in server_inet_address;
+struct sockaddr_un alamakota_server_unix_address;
+struct sockaddr_in alaniemakota_server_inet_address;
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
 request to_send;
@@ -27,15 +27,15 @@ request to_send;
 char client_path[MAX_PATH_LENGTH];
 char server_path[MAX_PATH_LENGTH];
 
-pthread_t thread;
-pthread_t main_thread;
+pthread_t wateczek;
+pthread_t mamusia;
 
-int wait_send = 0;
+int czekaj_no = 0;
 
 void *thread_fun(void *arg);
 
 void cleanup() {
-    close(socket1);
+    close(so_so_so_socket);
     remove(client_path);
     exit(0);
 }
@@ -43,11 +43,11 @@ void cleanup() {
 void sig_handler(int sig) {
     if(sig==SIGUSR1){
         pthread_mutex_lock(&mutex);
-        if (send(socket1, (void *) &to_send, sizeof(to_send), 0) == -1) {
+        if (send(so_so_so_socket, (void *) &to_send, sizeof(to_send), 0) == -1) {
             perror(NULL);
             exit(-11);
         }
-        wait_send = 0;
+        czekaj_no = 0;
         pthread_cond_signal(&cond);
         pthread_mutex_unlock(&mutex);
     }else
@@ -59,7 +59,7 @@ int main(int argc, char *argv[]) {
         printf("no enough args\n");
         exit(-1);
     }
-    main_thread = pthread_self();
+    mamusia = pthread_self();
     atexit(cleanup);
     signal(SIGINT, sig_handler);
     signal(SIGUSR1, sig_handler);
@@ -76,8 +76,8 @@ int main(int argc, char *argv[]) {
             printf("no enough args\n");
             exit(-1);
         }
-        strcpy(server_ip, argv[3]);
-        port = (int) strtol(argv[4], NULL, 10);
+        strcpy(server_aj_pi, argv[3]);
+        ppppport = (int) strtol(argv[4], NULL, 10);
 
     } else {
         printf("bad arg\n");
@@ -85,48 +85,48 @@ int main(int argc, char *argv[]) {
     }
 
     if (global == 1) {
-        socket1 = socket(AF_INET, SOCK_STREAM, 0);
+        so_so_so_socket = socket(AF_INET, SOCK_STREAM, 0);
     } else {
-        socket1 = socket(AF_UNIX, SOCK_STREAM, 0);
+        so_so_so_socket = socket(AF_UNIX, SOCK_STREAM, 0);
     }
-    if (socket1 == -1) {
+    if (so_so_so_socket == -1) {
         perror(NULL);
         exit(-5);
     }
 
     sprintf(client_path, "%s/st.socket", client_id);
 
-    memset(&server_unix_address, 0, sizeof(server_unix_address));
-    memset(&server_inet_address, 0, sizeof(server_inet_address));
+    memset(&alamakota_server_unix_address, 0, sizeof(alamakota_server_unix_address));
+    memset(&alaniemakota_server_inet_address, 0, sizeof(alaniemakota_server_inet_address));
 
     if (global == 0) {
-        server_unix_address.sun_family = AF_UNIX;
-        strcpy(server_unix_address.sun_path, server_path);
-        server_address = (struct sockaddr *) &server_unix_address;
+        alamakota_server_unix_address.sun_family = AF_UNIX;
+        strcpy(alamakota_server_unix_address.sun_path, server_path);
+        osp_server_address = (struct sockaddr *) &alamakota_server_unix_address;
     } else {
-        server_inet_address.sin_family = AF_INET;
-        inet_pton(AF_INET, server_ip, &server_inet_address.sin_addr.s_addr);
-        server_inet_address.sin_port = htons((uint16_t) port);
-        server_address = (struct sockaddr *) &server_inet_address;
+        alaniemakota_server_inet_address.sin_family = AF_INET;
+        inet_pton(AF_INET, server_aj_pi, &alaniemakota_server_inet_address.sin_addr.s_addr);
+        alaniemakota_server_inet_address.sin_port = htons((uint16_t) ppppport);
+        osp_server_address = (struct sockaddr *) &alaniemakota_server_inet_address;
     }
 
-    if (pthread_create(&thread, NULL, thread_fun, NULL) != 0) {
+    if (pthread_create(&wateczek, NULL, thread_fun, NULL) != 0) {
         perror(NULL);
         exit(-6);
     }
 
     if (global == 1) {
-        address_size = sizeof(struct sockaddr_in);
+        jakas_tam_zmienna = sizeof(struct sockaddr_in);
     } else {
-        address_size = sizeof(struct sockaddr_un);
+        jakas_tam_zmienna = sizeof(struct sockaddr_un);
     }
 
-    if (connect(socket1, server_address, address_size) == -1) {
+    if (connect(so_so_so_socket, osp_server_address, jakas_tam_zmienna) == -1) {
         perror(NULL);
         exit(-5);
     }
     strcpy(to_send.sender,client_id);
-    if (send(socket1, (void *) &to_send, sizeof(to_send), 0) == -1) {
+    if (send(so_so_so_socket, (void *) &to_send, sizeof(to_send), 0) == -1) {
         perror(NULL);
         exit(-6);
     }
@@ -135,12 +135,12 @@ int main(int argc, char *argv[]) {
     fd_set sockset;
     fd_set sockset1;
     FD_ZERO(&sockset);
-    FD_SET(socket1, &sockset);
+    FD_SET(so_so_so_socket, &sockset);
     while (1) {
         sockset1 = sockset;
-        if (select(socket1 + 1, &sockset1, NULL, NULL, NULL) > 0) {
-            if (FD_ISSET(socket1, &sockset1)) {
-                ssize_t tmp = recv(socket1, (void *) &request1, sizeof(request1), MSG_DONTWAIT);
+        if (select(so_so_so_socket + 1, &sockset1, NULL, NULL, NULL) > 0) {
+            if (FD_ISSET(so_so_so_socket, &sockset1)) {
+                ssize_t tmp = recv(so_so_so_socket, (void *) &request1, sizeof(request1), MSG_DONTWAIT);
                 if (tmp == -1) {
                     perror(NULL);
                 } else if(tmp>0) {
@@ -157,7 +157,7 @@ int main(int argc, char *argv[]) {
 void *thread_fun(void *arg) {
     while (1) {
         pthread_mutex_lock(&mutex);
-        while(wait_send)
+        while (czekaj_no)
             pthread_cond_wait(&cond,&mutex);
         char message_text[MAX_CLIENT_NAME_LENGTH], *result;
         result = fgets(message_text, MAX_CLIENT_NAME_LENGTH - 1, stdin);
@@ -167,11 +167,11 @@ void *thread_fun(void *arg) {
             } else {
                 strcpy(to_send.sender, client_id);
                 strcpy(to_send.mess, message_text);
-                wait_send = 1;
+                czekaj_no = 1;
             }
         }
         pthread_cond_signal(&cond);
         pthread_mutex_unlock(&mutex);
-        pthread_kill(main_thread,SIGUSR1);
+        pthread_kill(mamusia, SIGUSR1);
     }
 }

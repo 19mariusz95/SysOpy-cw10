@@ -9,24 +9,24 @@
 #include <time.h>
 #include "trzustka.h"
 
-int inet_socket;
-int unix_socket;
-char *path;
-long port;
-fd_set sockset;
+int zebra_inet_socket;
+int lis_unix_socket;
+char *kawiory;
+long krowa_port;
+fd_set kielbasa_sockset;
 
 
-struct sockaddr_un unix_address;
-struct sockaddr_in inet_address;
-struct sockaddr_un client_unix_address;
-struct sockaddr_in client_inet_address;
+struct sockaddr_un marmolada_unix_address;
+struct sockaddr_in dzem_inet_address;
+struct sockaddr_un stoperan_client_unix_address;
+struct sockaddr_in leki_client_inet_address;
 
-socklen_t unix_address_size = sizeof(struct sockaddr_un);
-socklen_t inet_address_size = sizeof(struct sockaddr_in);
+socklen_t rosol = sizeof(struct sockaddr_un);
+socklen_t krupnik = sizeof(struct sockaddr_in);
 
-void send_to_all(request request1);
+void send_to_all(request basia);
 
-void send_to(int i, request request1);
+void send_to(int i, request otwieracz);
 
 void unregister_clients();
 
@@ -37,34 +37,34 @@ void sig_handler(int sig) {
 }
 
 void cleanup() {
-    close(inet_socket);
-    close(unix_socket);
-    remove(path);
+    close(zebra_inet_socket);
+    close(lis_unix_socket);
+    remove(kawiory);
 }
 
-int register_client(request req, struct sockaddr *addr, message_type type) {
+int register_client(request zygfryd, struct sockaddr *obojniak, message_type e_tam) {
     for (int i = 0; i < MAX_CLIENTS; i++) {
         if (clients[i].state != INACTIVE) {
-            if (strcmp(clients[i].name, req.sender) == 0) {
+            if (strcmp(clients[i].name, zygfryd.sender) == 0) {
                 clients[i].time = time(NULL);
                 return 0;
             }
         }
     }
-    int free;
-    for (free = 0; free < MAX_CLIENTS && clients[free].state != INACTIVE; free++);
-    if (free == MAX_CLIENTS)
+    int wolny_ptak;
+    for (wolny_ptak = 0; wolny_ptak < MAX_CLIENTS && clients[wolny_ptak].state != INACTIVE; wolny_ptak++);
+    if (wolny_ptak == MAX_CLIENTS)
         return 1;
-    strcpy(clients[free].name, req.sender);
-    clients[free].time = time(NULL);
-    if (type == UNIX) {
-        clients[free].state = LOCAL;
-        clients[free].unix_address = *((struct sockaddr_un *) addr);
-    } else if (type == INET) {
-        clients[free].state = GLOBAL;
-        clients[free].inet_address = *((struct sockaddr_in *) addr);
+    strcpy(clients[wolny_ptak].name, zygfryd.sender);
+    clients[wolny_ptak].time = time(NULL);
+    if (e_tam == UNIX) {
+        clients[wolny_ptak].state = LOCAL;
+        clients[wolny_ptak].unix_address = *((struct sockaddr_un *) obojniak);
+    } else if (e_tam == INET) {
+        clients[wolny_ptak].state = GLOBAL;
+        clients[wolny_ptak].inet_address = *((struct sockaddr_in *) obojniak);
     }
-    printf("%s registered\n", req.sender);
+    printf("%s registered\n", zygfryd.sender);
     return 0;
 }
 
@@ -76,31 +76,31 @@ int main(int argc, char *argv[]) {
     }
     atexit(cleanup);
     signal(SIGINT, sig_handler);
-    port = strtol(argv[1], NULL, 10);
-    path = argv[2];
+    krowa_port = strtol(argv[1], NULL, 10);
+    kawiory = argv[2];
 
-    unix_socket = socket(AF_UNIX, SOCK_DGRAM, 0);
-    inet_socket = socket(AF_INET, SOCK_DGRAM, 0);
+    lis_unix_socket = socket(AF_UNIX, SOCK_DGRAM, 0);
+    zebra_inet_socket = socket(AF_INET, SOCK_DGRAM, 0);
 
-    if (unix_socket == -1 || inet_socket == -1) {
+    if (lis_unix_socket == -1 || zebra_inet_socket == -1) {
         printf("socket error\n");
         exit(-7);
     }
 
-    memset(&unix_address, 0, sizeof(unix_address));
-    memset(&inet_address, 0, sizeof(inet_address));
-    unix_address.sun_family = AF_UNIX;
-    strcpy(unix_address.sun_path, path);
+    memset(&marmolada_unix_address, 0, sizeof(marmolada_unix_address));
+    memset(&dzem_inet_address, 0, sizeof(dzem_inet_address));
+    marmolada_unix_address.sun_family = AF_UNIX;
+    strcpy(marmolada_unix_address.sun_path, kawiory);
 
-    inet_address.sin_family = AF_INET;
-    inet_address.sin_port = htons((uint16_t) port);
-    inet_address.sin_addr.s_addr = htonl(INADDR_ANY);
+    dzem_inet_address.sin_family = AF_INET;
+    dzem_inet_address.sin_port = htons((uint16_t) krowa_port);
+    dzem_inet_address.sin_addr.s_addr = htonl(INADDR_ANY);
 
-    if (bind(unix_socket, (struct sockaddr *) &unix_address, sizeof(unix_address)) != 0) {
+    if (bind(lis_unix_socket, (struct sockaddr *) &marmolada_unix_address, sizeof(marmolada_unix_address)) != 0) {
         perror(NULL);
         exit(-5);
     }
-    if (bind(inet_socket, (struct sockaddr *) &inet_address, sizeof(inet_address)) != 0) {
+    if (bind(zebra_inet_socket, (struct sockaddr *) &dzem_inet_address, sizeof(dzem_inet_address)) != 0) {
         perror(NULL);
         exit(-6);
     }
@@ -109,46 +109,46 @@ int main(int argc, char *argv[]) {
         clients[i].state = INACTIVE;
     }
 
-    message_type message_r;
-    request request1;
+    message_type projektor;
+    request vader;
 
     fd_set sockset1;
-    FD_ZERO(&sockset);
-    FD_SET(unix_socket, &sockset);
-    FD_SET(inet_socket, &sockset);
+    FD_ZERO(&kielbasa_sockset);
+    FD_SET(lis_unix_socket, &kielbasa_sockset);
+    FD_SET(zebra_inet_socket, &kielbasa_sockset);
     int flaga = 1;
     while (flaga) {
-        sockset1 = sockset;
-        message_r = NO_MESSAGE;
+        sockset1 = kielbasa_sockset;
+        projektor = NO_MESSAGE;
         struct timeval tim1;
         tim1.tv_sec = 1;
         tim1.tv_usec = 0;
-        if (select(unix_socket > inet_socket ? unix_socket + 1 : inet_socket + 1, &sockset1, NULL, NULL, &tim1) > 0) {
-            if (FD_ISSET(unix_socket, &sockset1)) {
-                ssize_t tmp = recvfrom(unix_socket, &request1, sizeof(request1), MSG_DONTWAIT,
-                                       (struct sockaddr *) &client_unix_address,
-                                       &unix_address_size);
+        if (select(lis_unix_socket > zebra_inet_socket ? lis_unix_socket + 1 : zebra_inet_socket + 1, &sockset1, NULL, NULL, &tim1) > 0) {
+            if (FD_ISSET(lis_unix_socket, &sockset1)) {
+                ssize_t tmp = recvfrom(lis_unix_socket, &vader, sizeof(vader), MSG_DONTWAIT,
+                                       (struct sockaddr *) &stoperan_client_unix_address,
+                                       &rosol);
                 if (tmp > 0) {
-                    message_r = UNIX;
+                    projektor = UNIX;
                 } else if (tmp == 0) {
                     printf("disconnected\n");
                     exit(1);
                 }
-            } else if (FD_ISSET(inet_socket, &sockset1)) {
-                ssize_t tmp = recvfrom(inet_socket, &request1, sizeof(request1), MSG_DONTWAIT,
-                                       (struct sockaddr *) &client_inet_address,
-                                       &inet_address_size);
+            } else if (FD_ISSET(zebra_inet_socket, &sockset1)) {
+                ssize_t tmp = recvfrom(zebra_inet_socket, &vader, sizeof(vader), MSG_DONTWAIT,
+                                       (struct sockaddr *) &leki_client_inet_address,
+                                       &krupnik);
                 if (tmp > 0) {
-                    message_r = INET;
+                    projektor = INET;
                 } else if (tmp == 0) {
                     printf("disconnected\n");
                     exit(1);
                 }
             }
-            if (message_r != NO_MESSAGE) {
-                register_client(request1, message_r == UNIX ? (struct sockaddr *) &client_unix_address
-                                                            : (struct sockaddr *) &client_inet_address, message_r);
-                send_to_all(request1);
+            if (projektor != NO_MESSAGE) {
+                register_client(vader, projektor == UNIX ? (struct sockaddr *) &stoperan_client_unix_address
+                                                            : (struct sockaddr *) &leki_client_inet_address, projektor);
+                send_to_all(vader);
             }
         }
         unregister_clients();
@@ -164,30 +164,30 @@ void unregister_clients() {
     }
 }
 
-void send_to_all(request request1) {
+void send_to_all(request basia) {
     for (int i = 0; i < MAX_CLIENTS; i++) {
-        if (clients[i].state != INACTIVE && strcmp(request1.sender, clients[i].name) != 0) {
-            send_to(i, request1);
+        if (clients[i].state != INACTIVE && strcmp(basia.sender, clients[i].name) != 0) {
+            send_to(i, basia);
         }
     }
 }
 
-void send_to(int i, request request1) {
+void send_to(int i, request otwieracz) {
     struct sockaddr *address;
     int socket;
     socklen_t address_len;
     if (clients[i].state == LOCAL) {
         address = (struct sockaddr *) &(clients[i].unix_address);
-        socket = unix_socket;
-        address_len = unix_address_size;
+        socket = lis_unix_socket;
+        address_len = rosol;
     } else {
         address = (struct sockaddr *) &(clients[i].inet_address);
-        socket = inet_socket;
-        address_len = inet_address_size;
+        socket = zebra_inet_socket;
+        address_len = krupnik;
         char ip[20];
         inet_ntop(AF_INET, &(clients[i].inet_address.sin_addr.s_addr), ip, 20);
     }
-    if (sendto(socket, (void *) &request1, sizeof(request1), 0, address, address_len) == -1) {
+    if (sendto(socket, (void *) &otwieracz, sizeof(otwieracz), 0, address, address_len) == -1) {
         perror(NULL);
     }
 }
